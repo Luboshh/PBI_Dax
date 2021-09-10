@@ -1,0 +1,6 @@
+_7 = 
+
+var Max_rok_mesic_lokalita = [Max v danem roce, mesici, lokalite]
+var Max_ = CALCULATE(MAX(data[PRCP]),ALL('dim lokality'[NAME]),ALL('dim datumy'[Mesic]))
+
+RETURN Max_rok_mesic_lokalita - Max_
