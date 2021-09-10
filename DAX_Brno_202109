@@ -1,6 +1,253 @@
-_7 = 
+agregovana data = 
 
-var Max_rok_mesic_lokalita = [Max v danem roce, mesici, lokalite]
-var Max_ = CALCULATE(MAX(data[PRCP]),ALL('dim lokality'[NAME]),ALL('dim datumy'[Mesic]))
+ADDCOLUMNS(
+SUMMARIZE(
+    data, -- tabulka, ze ktere bereme data
+    data[Index],data[Rok], -- sloupce, podle kterych agregujeme
+    "Srazky",SUM(data[PRCP]), -- novy sloupec definovany funkci SUM()
+    "Max. teplota",MAX(data[TMAX]) -- novy sloupec definvoany funkci MAX()
+    ) ,
+ -- za pomoci funkce ADDCOLUMNS pridavame novy sloupec tabulky,
+ -- jehoz navratova hodnota je podminena hodnotou sloupce agregovane tabulky   
+"Tropicky den",
+IF([Max. teplota] >= 34,"Ano","Ne")
+)
 
-RETURN Max_rok_mesic_lokalita - Max_
+
+    
+    ---------------------
+    
+    tabulka datum cas = 
+ADDCOLUMNS(
+CROSSJOIN(
+CALENDARAUTO(),
+UNION(
+    ROW("Cas",TIME(9,0,0)),
+    ROW("Cas",TIME(12,0,0))
+)),"Datum a cas", [Date]+[Cas])
+
+
+-----------------------------
+
+suma vybrany index + index 9 v danem roce = 
+
+-- suma za uzivatelem vybrany index
+VAR tento_rok = sUM(data[PRCP])
+
+-- suma za index 9
+VAR index_9 = 
+SUMX(
+    FILTER(ALL(data),
+    data[Index] = 9
+    && data[Rok] in VALUES(data[Rok])
+    ),
+data[PRCP])
+
+return index_9 + tento_rok 
+
+
+-----------------------------------------
+
+_suma srazek mezirocne = 
+
+// -- suma srazek v danem roce a dane lokalite
+SUM(data[PRCP])
+
+-- minus
+-
+
+-- suma srazek v predchozim roce a dane lokalite
+SUMX(
+FILTER(
+    /*
+    Krok 1: Funkce ALL vraci vsechna data z tabulky data,
+    tj. rusime vsechny aplikovane filtry
+    */
+    ALL(data),
+
+    /*
+    Krok 2: Funkce FILTER filtruje tabulku vracenou krokem 1,
+    aplikujeme filtry na sloupce [Rok] a [Index]
+
+    */
+    data[Rok] = MAX(data[Rok])-1 -- max. rok vraci cele cislo, odecitame 1
+    -- hledame vsechnz index, ktere zustaly v tabulce dim lokality
+    -- pote, co uzivatel vybral hodnotu z prurezu
+    && data[Index] IN VALUES ('dim lokality'[Index])),
+-- krok 3: tabulku vracenou funkci FILTER() scitame nad sloupcem PRCP
+data[PRCP]) 
+
+
+
+---------------------------
+
+prumer srazek v danem roce v uzivatelem vybrane lokalite vs prumer vse = 
+/*
+Rozdíl mezi:
+- prumer srazek v danem roce v uzivatelem zvolene lokalite
+- prumer srazek v danem roce ve vsech lokalitach
+*/
+IF(ISFILTERED('dim lokality'[NAME]),
+AVERAGE(data[PRCP])
+- 
+AVERAGEX(
+    FILTER(
+        ALL(data),
+    data[Rok] IN VALUES('dim datum'[Rok])),
+    data[PRCP]),"Nemáš tam filtr!")
+
+-------------------------------------
+
+suma srazek v danem roce vs suma srazek v minimalnim roce = 
+
+-- suma srazek v danem roce
+VAR srazky_v_danem_roce = SUM(data[PRCP])
+-- minimalni rok
+VAR minimalni_rok = 
+MINX(
+    ALL(data),data[Rok])
+--  suma srazek v minimalnim roce
+VAR srazky_min_rok = 
+SUMX(
+FILTER(
+    ALL(data),data[Rok] = minimalni_rok
+    &&data[Index] in VALUES('dim lokality'[Index])
+    ),
+data[PRCP])
+
+RETURN srazky_v_danem_roce - srazky_min_rok
+
+
+
+----------------------------------------------
+
+datum max srazek = 
+
+/*
+- maximalni denni srazky napric lokalitami a datumy
+- posledni den maximalnich srazek
+*/
+
+VAR max_srazky = MAXX(
+    ALL(data),
+data[PRCP])
+
+VAR posledni_den_max_srazek = 
+
+MAXX(
+FILTER(
+    ALL(
+    data),data[PRCP] = max_srazky),data[DATE])
+return posledni_den_max_srazek
+
+
+----------------------------
+
+__suma srazek v danem roce dane lokality = 
+
+-- suma srazek za vsechny mesice daneho roku a dane lokality
+
+/*
+SELECT SUM(data[PRCP])  GROUP BY rok,name)
+*/
+
+CALCULATE(
+    SUM(data[PRCP]),
+    ALL('dim datum'[Mesic]))
+    
+    
+    --------------
+    
+    __suma srazek v dane lokalite prvnim mesici daneho roku = 
+
+CALCULATE(
+    SUM(data[PRCP]),
+    FILTER(ALL('dim datum'[Mesic]),'dim datum'[Mesic] = 1))
+    
+    
+    
+    -------------------------------------
+    
+    __suma srazek dany rok vsechny lokality = 
+
+CALCULATE(
+    SUM(data[PRCP]),
+    ALL('dim datum'[Rok]),
+    ALL('dim lokality'[NAME])
+    )
+   
+--------------------------------------------------------
+
+___suma srazek 2000 v RUZYNE = 
+
+CALCULATE(
+    SUM(data[PRCP]),
+    FILTER('dim lokality','dim lokality'[NAME] = "RUZYNE"),
+    FILTER('dim datum','dim datum'[Rok] = 2000))
+
+Odkaz na vypracovane cviceni: https://github.com/petrrozkosny/pwbi2/blob/main/pwbi%20-%20vypracovane%20cviceni.pbix
+
+
+
+------------------------------------------------
+
+4 = 
+
+VAR prvni_mesic_roku_lokality = 
+CALCULATE(
+    MONTH(
+    MIN(data[DATE]))
+    ,ALL('dim datumy'[Mesic]))
+
+RETURN
+
+SUM(data[PRCP])
+/
+CALCULATE(
+    SUM(data[PRCP]),FILTER(ALL('dim datumy'[Mesic]),'dim datumy'[Mesic] = prvni_mesic_roku_lokality)) -1
+    
+    
+    
+    -----------
+5 = 
+
+MAX(data[PRCP])
+-
+CALCULATE(
+    MAX(data[PRCP]),
+    ALL('dim datumy'[Mesic]))
+    
+    
+------------
+
+6 = 
+
+MAX(data[PRCP])
+-
+CALCULATE(MAX(data[PRCP]),
+ALL('dim lokality'[NAME]))
+
+
+--------------------------------------
+7 = 
+
+MAX(data[PRCP])
+-
+CALCULATE(MAX(data[PRCP]),
+ALL('dim lokality'[NAME]),ALL('dim datumy'[Mesic]))
+
+
+---------------
+
+8 = 
+
+CALCULATE(sum(data[PRCP]),
+FILTER(ALL('dim datumy'[Mesic]),'dim datumy'[Mesic]<=MAX('dim datumy'[Mesic])))
+
+
+-------------------------
+
+10 = 
+
+CALCULATE(
+    MAX(data[PRCP]),ALL('dim datumy'[Mesic]))
